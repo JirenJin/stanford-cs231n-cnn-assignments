@@ -171,9 +171,8 @@ class FullyConnectedNet(object):
     # beta2, etc. Scale parameters should be initialized to one and shift      #
     # parameters should be initialized to zero.                                #
     ############################################################################
-    num_layers = len(hidden_dims)
     dims = [input_dim] + hidden_dims + [num_classes]
-    for i in xrange(num_layers):
+    for i in xrange(self.num_layers):
         W_name = 'W' + str(i)
         b_name = 'b' + str(i)
         self.params[W_name] = weight_scale * np.random.randn(dims[i], dims[i+1])
@@ -235,7 +234,21 @@ class FullyConnectedNet(object):
     # self.bn_params[1] to the forward pass for the second batch normalization #
     # layer, etc.                                                              #
     ############################################################################
-    pass
+    caches = []
+    dropout_caches = []
+    out = X
+    for i in xrange(self.num_layers):
+        W_name = 'W' + str(i)
+        b_name = 'b' + str(i)
+        if i < self.num_layers-1:
+            out, cache = affine_relu_forward(out, self.params[W_name], self.params[b_name])
+            caches.append(cache)
+            if self.use_dropout:
+                out, dropout_cache = dropout_forward(out, self.dropout_param)
+                dropout_caches.append(dropout_cache)
+        else:
+            scores, cache = affine_forward(out, self.params[W_name], self.params[b_name])
+            caches.append(cache)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -258,7 +271,19 @@ class FullyConnectedNet(object):
     # automated tests, make sure that your L2 regularization includes a factor #
     # of 0.5 to simplify the expression for the gradient.                      #
     ############################################################################
-    pass
+    loss, d_scores = softmax_loss(scores, y)
+    for i in range(self.num_layers)[::-1]:
+        W_name = 'W' + str(i)
+        b_name = 'b' + str(i)
+        loss += 1/2.0 * self.reg * np.sum(self.params[W_name] ** 2)
+        if i == self.num_layers - 1:
+            d_out, grads[W_name], grads[b_name] = affine_backward(d_scores, caches[i])
+        else:
+            if self.use_dropout:
+                d_out = dropout_backward(d_out, dropout_caches[i])
+            d_out, grads[W_name], grads[b_name] = affine_relu_backward(d_out, caches[i])
+        grads[W_name] += self.reg * self.params[W_name]
+
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
